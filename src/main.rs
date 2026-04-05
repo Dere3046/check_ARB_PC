@@ -273,50 +273,54 @@ impl App {
         self.insp_out = self.tr.get(K::INSP_CHECKING).to_string();
 
         let path = self.insp_file.to_string_lossy().to_string();
-        let full_mode = false; // Quick mode by default
+        let full_mode = false;
         let debug = self.insp_debug;
 
         match inspector::inspect_image(&path, debug, full_mode) {
             Ok(result) => {
                 let mut out = String::new();
                 out.push_str("=== arb_inspector_next ===\n\n");
-                out.push_str(&format!("文件: {}\n", path));
-                out.push_str(&format!("格式: {}\n", result.elf_class));
+                out.push_str(&format!("File: {}\n", path));
+                out.push_str(&format!("Format: {}\n", result.elf_class));
 
                 if full_mode {
-                    out.push_str(&format!("入口点: 0x{:x}\n", result.e_entry));
-                    out.push_str(&format!("机器: 0x{:x}\n", result.e_machine));
-                    out.push_str(&format!("类型: 0x{:x}\n", result.e_type));
-                    out.push_str(&format!("标志: 0x{:x}\n", result.e_flags));
-                    out.push_str(&format!("程序头数量: {}\n\n", result.e_phnum));
+                    out.push_str(&format!("Entry: 0x{:x}\n", result.e_entry));
+                    out.push_str(&format!("Machine: 0x{:x}\n", result.e_machine));
+                    out.push_str(&format!("Type: 0x{:x}\n", result.e_type));
+                    out.push_str(&format!("Flags: 0x{:x}\n", result.e_flags));
+                    out.push_str(&format!("Program Headers: {}\n\n", result.e_phnum));
                 }
 
                 if let Some(arb) = result.arb {
-                    out.push_str(&format!("ARB (Anti-Rollback): {}\n", arb));
+                    out.push_str(&format!("OEM Metadata Major Version : {}\n", 
+                        result.hash_table_info.as_ref().and_then(|ht| ht.oem_metadata_version.as_ref())
+                            .map(|v| v.split('.').next().unwrap_or("0")).unwrap_or("0")));
+                    out.push_str(&format!("OEM Metadata Minor Version : {}\n",
+                        result.hash_table_info.as_ref().and_then(|ht| ht.oem_metadata_version.as_ref())
+                            .map(|v| v.split('.').nth(1).unwrap_or("0")).unwrap_or("0")));
+                    out.push_str(&format!("ARB (Anti-Rollback)        : {}\n", arb));
                 } else {
-                    out.push_str("ARB (Anti-Rollback): 未找到\n");
+                    out.push_str("ARB (Anti-Rollback): Not found\n");
                 }
 
                 if let Some(ref ht) = result.hash_table_info {
-                    out.push_str(&format!("OEM 元数据版本: {}\n",
-                        ht.oem_metadata_version.as_deref().unwrap_or("未知")));
                     if let Some(oem_arb) = ht.oem_arb {
-                        out.push_str(&format!("OEM ARB: {}\n", oem_arb));
+                        out.push_str(&format!("OEM ARB Value: {}\n", oem_arb));
                     }
-                    out.push_str(&format!("哈希表条目: {}\n", ht.hash_count));
+                    out.push_str(&format!("Hash Segment Entries: {}\n", ht.hash_count));
                 }
 
                 if !result.computed_hashes.is_empty() {
-                    out.push_str(&format!("\n计算的段哈希: {} 个\n", result.computed_hashes.len()));
+                    out.push_str(&format!("\nComputed Segment Hashes: {}\n", result.computed_hashes.len()));
                 }
 
                 if debug && !result.debug_output.is_empty() {
-                    out.push_str(&format!("\n--- 调试输出 ---\n{}", result.debug_output));
+                    out.push_str(&format!("\n--- Debug Output ---\n{}", result.debug_output));
                 }
 
                 self.insp_out = out;
             }
-            Err(e) => self.insp_out = format!("错误: {}\n\n提示: 支持 ELF 格式的 Qualcomm bootloader 镜像", e),
+            Err(e) => self.insp_out = format!("Error: {}\n\nNote: Supports ELF format (Qualcomm bootloader images)", e),
         }
     }
 
